@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Multi-threaded Sum</title>
+</head>
+<body>
+    <script src="public/sum_threads.js"></script>
+    <script>
+        Module.onRuntimeInitialized = function() {
+            console.log("WASM Module Loaded");
+
+            const sum = Module.ccall("compute_sum", "number", [], []);
+            console.log("Total Sum:", sum);
+        };
+    </script>
+</body>
+</html>
