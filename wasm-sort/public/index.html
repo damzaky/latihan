@@ -25,7 +25,17 @@
     </table>
 
     <script>
-        const ROW_NUM = 50000;
+        const ROW_NUM = 10_000_000;
+        const ROW_SHOWN = 100;
+
+        const WORKER_COUNT = 4;
+        const workerPool = [];
+
+        for (let i = 0; i < WORKER_COUNT; i++) {
+            const worker = new Worker("worker.js");
+            worker.isBusy = false;
+            workerPool.push(worker);
+        }
 
         const cssColors = [
             "red", "blue", "green", "yellow", "purple", "orange", "pink", "brown",
@@ -70,7 +80,7 @@
                 `;
                 tbody.appendChild(row);
 
-                if (idx === 999) { // only show first 1000 rows
+                if (idx === ROW_SHOWN - 1) { // only show first ROW_SHOWN rows
                     break;
                 }
             }
@@ -146,43 +156,50 @@
                 quickSortIterative(masterData, sortColumn); // Now calling quickSort with left and right indices
                 if (sortDirection[columnIndex] === -1) masterData.reverse();
             } else if (algorithm === "worker") {
-                const chunks = 4;
-                const size = Math.ceil(masterData.length / chunks);
-                const workers = [];
-                const promises = [];
+                const size = Math.ceil(masterData.length / WORKER_COUNT);
+                const sortedChunks = new Array(WORKER_COUNT);
+                let completed = 0;
 
-                for (let i = 0; i < chunks; i++) {
+                const startTime = performance.now();
+
+                for (let i = 0; i < WORKER_COUNT; i++) {
+                    const worker = workerPool[i];
+                    worker.isBusy = true;
+
                     const start = i * size;
-                    const end = start + size;
+                    const end = Math.min(start + size, masterData.length);
                     const chunk = masterData.slice(start, end);
 
-                    workers[i] = new Worker("worker.js");
-                    promises.push(new Promise((resolve) => {
-                        workers[i].onmessage = (e) => resolve(e.data);
-                        workers[i].postMessage({ data: chunk, sortColumn });
-                    }));
+                    worker.onmessage = (e) => {
+                        sortedChunks[i] = e.data;
+                        worker.isBusy = false;
+
+                        completed++;
+                        if (completed === WORKER_COUNT) {
+                            masterData = sortedChunks.flat();
+
+                            masterData.sort((a, b) => {
+                                if (sortColumn === 0) return (a[0] - b[0]) * sortDirection[sortColumn];
+                                if (sortColumn === 1) return (a[1] - b[1]) * sortDirection[sortColumn];
+                                return a[2].localeCompare(b[2]) * sortDirection[sortColumn];
+                            });
+
+                            sortDirection[columnIndex] *= -1;
+
+                            const endTime = performance.now();
+                            const duration = (endTime - startTime).toFixed(2);
+                            document.getElementById("sortTime").textContent = `Sort Time: ${duration} ms`;
+
+                            renderTable();
+                        }
+                    };
+
+                    worker.postMessage({ data: chunk, sortColumn });
                 }
 
-                Promise.all(promises).then((sortedChunks) => {
-                    masterData = sortedChunks.flat();
-
-                    masterData.sort((a, b) => {
-                        if (sortColumn === 0) return (a[0] - b[0]) * sortDirection[sortColumn];
-                        if (sortColumn === 1) return (a[1] - b[1]) * sortDirection[sortColumn];
-                        return a[2].localeCompare(b[2]) * sortDirection[sortColumn];
-                    });
-
-                    sortDirection[columnIndex] *= -1;
-
-                    const endTime = performance.now();
-                    const duration = (endTime - startTime).toFixed(2);
-                    document.getElementById("sortTime").textContent = `Sort Time: ${duration} ms`;
-
-                    renderTable();
-                });
-
-                return; // Skip the sortDirection toggle below until the promise resolves
+                return; // Prevent further sorting until workers return
             }
+
 
 
             // Reverse sorting direction for next click
@@ -197,6 +214,11 @@
         }
 
         populateMasterData(); // Initially populate and render the table
+
+        window.addEventListener("beforeunload", () => {
+            workerPool.forEach((worker) => worker.terminate());
+        });
+
     </script>
 </body>
 </html>
