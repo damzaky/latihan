@@ -1,35 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sortable Table with Web Workers</title>
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        th, td {
-            border: 1px solid black;
-            padding: 8px;
-            text-align: left;
-            cursor: pointer;
-        }
-        th {
-            background-color: #f4f4f4;
-        }
-        .controls {
-            margin-bottom: 10px;
-        }
-        .timing {
-            margin-top: 10px;
-            font-weight: bold;
-        }
-    </style>
 </head>
 <body>
-
     <div class="controls">
         <label for="sortAlgorithm">Choose Sorting Algorithm:</label>
         <select id="sortAlgorithm">
@@ -38,9 +12,6 @@
             <option value="worker">Quick Sort with Web Workers</option>
         </select>
     </div>
-
-    <div class="timing" id="sortTime">Sort Time: -</div>
-
     <table>
         <thead>
             <tr>
@@ -134,52 +105,9 @@
             }
         }
 
-        function quickSortWithWorkers(rows) {
-            const numWorkers = 4;
-            const workerPromises = [];
-            const chunkSize = Math.ceil(rows.length / numWorkers);
-
-            const startTime = performance.now();
-
-            // Split rows into chunks
-            for (let i = 0; i < numWorkers; i++) {
-                const start = i * chunkSize;
-                const end = Math.min((i + 1) * chunkSize, rows.length);
-                const chunk = rows.slice(start, end);
-                
-                const worker = new Worker('worker.js'); // Create the worker from an external file
-
-                workerPromises.push(new Promise((resolve, reject) => {
-                    worker.onmessage = function(e) {
-                        resolve(e.data);
-                    };
-                    worker.onerror = reject;
-                    worker.postMessage({ rows: chunk, sortColumn: sortColumn });
-                }));
-            }
-
-            // Wait for all workers to finish
-            Promise.all(workerPromises).then(sortedChunks => {
-                // Merge sorted chunks (simplified merge for this case)
-                const sortedRows = sortedChunks.flat();
-                if (sortDirection[sortColumn] === -1) sortedRows.reverse();
-
-                masterData = sortedRows; // Update masterData with the sorted rows
-                renderTable(); // Re-render the table with sorted rows
-
-                // Update sorting time
-                const endTime = performance.now();
-                const duration = (endTime - startTime).toFixed(2);
-                document.getElementById("sortTime").textContent = `Sort Time: ${duration} ms`;
-            });
-        }
-
         function sortTable(columnIndex) {
             sortColumn = columnIndex; // Update the global sorting column index
             const algorithm = document.getElementById("sortAlgorithm").value;
-
-            // Start timer
-            const startTime = performance.now();
 
             if (algorithm === "js") {
                 masterData.sort((rowA, rowB) => {
@@ -189,14 +117,39 @@
                 quickSort(masterData, 0, masterData.length - 1, sortColumn); // Now calling quickSort with left and right indices
                 if (sortDirection[columnIndex] === -1) masterData.reverse();
             } else if (algorithm === "worker") {
-                quickSortWithWorkers(masterData);
-                return; // Don't proceed with normal sort if using workers
+                const chunks = 4;
+                const size = Math.ceil(masterData.length / chunks);
+                const workers = [];
+                const promises = [];
+
+                for (let i = 0; i < chunks; i++) {
+                    const start = i * size;
+                    const end = start + size;
+                    const chunk = masterData.slice(start, end);
+
+                    workers[i] = new Worker("worker.js");
+                    promises.push(new Promise((resolve) => {
+                        workers[i].onmessage = (e) => resolve(e.data);
+                        workers[i].postMessage({ data: chunk, sortColumn });
+                    }));
+                }
+
+                Promise.all(promises).then((sortedChunks) => {
+                    masterData = sortedChunks.flat();
+
+                    masterData.sort((a, b) => {
+                        if (sortColumn === 0) return (a[0] - b[0]) * sortDirection[sortColumn];
+                        if (sortColumn === 1) return (a[1] - b[1]) * sortDirection[sortColumn];
+                        return a[2].localeCompare(b[2]) * sortDirection[sortColumn];
+                    });
+
+                    sortDirection[columnIndex] *= -1;
+                    renderTable();
+                });
+
+                return; // Skip the sortDirection toggle below until the promise resolves
             }
 
-            // Update sorting time
-            const endTime = performance.now();
-            const duration = (endTime - startTime).toFixed(2);
-            document.getElementById("sortTime").textContent = `Sort Time: ${duration} ms`;
 
             // Reverse sorting direction for next click
             sortDirection[columnIndex] *= -1;
