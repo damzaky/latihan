@@ -3,28 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Table with More Colors</title>
+    <title>Sortable Table with Web Workers</title>
     <style>
         table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 10px;
         }
         th, td {
             border: 1px solid black;
             padding: 8px;
             text-align: left;
+            cursor: pointer;
         }
         th {
             background-color: #f4f4f4;
         }
+        .controls {
+            margin-bottom: 10px;
+        }
+        .timing {
+            margin-top: 10px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
+
+    <div class="controls">
+        <label for="sortAlgorithm">Choose Sorting Algorithm:</label>
+        <select id="sortAlgorithm">
+            <option value="js">JavaScript Sort</option>
+            <option value="quick">Quick Sort</option>
+            <option value="worker">Quick Sort with Web Workers</option>
+        </select>
+    </div>
+
+    <div class="timing" id="sortTime">Sort Time: -</div>
+
     <table>
         <thead>
             <tr>
-                <th>Index</th>
-                <th>Random Safe Integer</th>
+                <th onclick="sortTable(0)">Index 🔽</th>
+                <th onclick="sortTable(1)">Random Safe Integer 🔽</th>
                 <th>Color Combination</th>
             </tr>
         </thead>
@@ -37,6 +58,8 @@
             "gray", "black", "white", "cyan", "magenta", "lime", "maroon", "navy",
             "olive", "teal", "silver", "gold", "coral", "violet", "indigo", "turquoise"
         ];
+
+        let sortDirection = [1, 1]; // Stores sorting order (1 for ascending, -1 for descending)
 
         function getRandomSafeInteger() {
             return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
@@ -60,6 +83,120 @@
             }
 
             tbody.innerHTML = rows;
+        }
+
+        let sortColumn = 0; // Track the column being sorted
+
+        function extractRowData() {
+            const tbody = document.getElementById("table-body");
+            const rows = Array.from(tbody.rows);
+            return rows.map(row => ({
+                index: row.cells[0].textContent,
+                randomInt: row.cells[1].textContent,
+                colors: row.cells[2].textContent
+            }));
+        }
+
+        function quickSort(arr) {
+            if (arr.length <= 1) return arr;
+            const pivot = arr[arr.length - 1];
+            const left = arr.slice(0, -1).filter(item => parseInt(item[sortColumn]) <= parseInt(pivot[sortColumn]));
+            const right = arr.slice(0, -1).filter(item => parseInt(item[sortColumn]) > parseInt(pivot[sortColumn]));
+            return [...quickSort(left), pivot, ...quickSort(right)];
+        }
+
+        function quickSortWithWorkers(rows) {
+            const numWorkers = 4;
+            const workerPromises = [];
+            const chunkSize = Math.ceil(rows.length / numWorkers);
+
+            const startTime = performance.now();
+
+            // Split rows into chunks
+            for (let i = 0; i < numWorkers; i++) {
+                const start = i * chunkSize;
+                const end = Math.min((i + 1) * chunkSize, rows.length);
+                const chunk = rows.slice(start, end);
+                
+                const worker = new Worker('worker.js'); // Create the worker from an external file
+
+                workerPromises.push(new Promise((resolve, reject) => {
+                    worker.onmessage = function(e) {
+                        resolve(e.data);
+                    };
+                    worker.onerror = reject;
+                    worker.postMessage({ rows: chunk, sortColumn: sortColumn });
+                }));
+            }
+
+            // Wait for all workers to finish
+            Promise.all(workerPromises).then(sortedChunks => {
+                // Merge sorted chunks (simplified merge for this case)
+                const sortedRows = sortedChunks.flat();
+                if (sortDirection[sortColumn] === -1) sortedRows.reverse();
+
+                // Rebuild the table with sorted rows
+                const tbody = document.getElementById("table-body");
+                tbody.innerHTML = "";
+                sortedRows.forEach(rowData => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${rowData.index}</td>
+                        <td>${rowData.randomInt}</td>
+                        <td>${rowData.colors}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                // Update sorting time
+                const endTime = performance.now();
+                const duration = (endTime - startTime).toFixed(2);
+                document.getElementById("sortTime").textContent = `Sort Time: ${duration} ms`;
+            });
+        }
+
+        function sortTable(columnIndex) {
+            const rows = extractRowData();
+            const algorithm = document.getElementById("sortAlgorithm").value;
+            sortColumn = columnIndex; // Update the global sorting column index
+
+            // Start timer
+            const startTime = performance.now();
+
+            if (algorithm === "js") {
+                rows.sort((rowA, rowB) => {
+                    let cellA = rowA[Object.keys(rowA)[columnIndex]];
+                    let cellB = rowB[Object.keys(rowB)[columnIndex]];
+                    return (cellA - cellB) * sortDirection[columnIndex];
+                });
+            } else if (algorithm === "quick") {
+                rows = quickSort(rows);
+                if (sortDirection[columnIndex] === -1) rows.reverse();
+            } else if (algorithm === "worker") {
+                quickSortWithWorkers(rows);
+                return; // Don't proceed with normal sort if using workers
+            }
+
+            // Update sorting time
+            const endTime = performance.now();
+            const duration = (endTime - startTime).toFixed(2);
+            document.getElementById("sortTime").textContent = `Sort Time: ${duration} ms`;
+
+            // Reverse sorting direction for next click
+            sortDirection[columnIndex] *= -1;
+
+            // Rebuild the table with sorted rows
+            const tbody = document.getElementById("table-body");
+            tbody.innerHTML = "";
+            rows.forEach(rowData => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${rowData.index}</td>
+                    <td>${rowData.randomInt}</td>
+                    <td>${rowData.colors}</td>
+                `;
+                tbody.appendChild(row);
+            });
         }
 
         populateTable();
