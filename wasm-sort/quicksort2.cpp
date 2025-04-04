@@ -1,39 +1,32 @@
 #include <iostream>
 #include <vector>
+#include <algorithm>
 
 extern "C" {
 
-// QuickSort for 2D array
-void quicksort(int* arr, int low, int high, int numCols) {
+// QuickSort for sorting based on a specific column (index)
+void quicksort(int* arr, int* indices, int low, int high, int numCols, int targetCol) {
     if (low < high) {
-        int pivot = arr[high * numCols];  // First element of the last row
+        int pivot = arr[indices[high] * numCols + targetCol];
         int i = (low - 1);
 
         for (int j = low; j < high; j++) {
-            if (arr[j * numCols] < pivot) {  // Compare the first column
+            if (arr[indices[j] * numCols + targetCol] < pivot) {
                 i++;
-                // Swap the entire row (i-th row and j-th row)
-                for (int k = 0; k < numCols; k++) {
-                    std::swap(arr[i * numCols + k], arr[j * numCols + k]);
-                }
+                std::swap(indices[i], indices[j]);
             }
         }
-
-        // Swap the pivot row with the i-th row
-        for (int k = 0; k < numCols; k++) {
-            std::swap(arr[(i + 1) * numCols + k], arr[high * numCols + k]);
-        }
-
+        std::swap(indices[i + 1], indices[high]);
         int pi = i + 1;
 
-        quicksort(arr, low, pi - 1, numCols);
-        quicksort(arr, pi + 1, high, numCols);
+        quicksort(arr, indices, low, pi - 1, numCols, targetCol);
+        quicksort(arr, indices, pi + 1, high, numCols, targetCol);
     }
 }
 
-// Exposed function to sort a 2D array (in-place) by the first column
-void quicksort_js(int* arr, int rows, int cols) {
-    quicksort(arr, 0, rows - 1, cols);
+// Exposed function to sort based on a single column and return the sorted indices
+void quicksort_js(int* arr, int* indices, int rows, int cols, int targetCol) {
+    quicksort(arr, indices, 0, rows - 1, cols, targetCol);
 }
 
 }

@@ -24,7 +24,7 @@
         <tbody id="table-body"></tbody>
     </table>
 
-    <script src="quicksort.js"></script>
+    <script src="quicksort2.js"></script>
     <script>
         const ROW_NUM = 100//10_000_000;
         const ROW_SHOWN = 100;
@@ -134,46 +134,53 @@
             }
         }
 
-        let wasmModule;
+        async function wasmQuicksort(targetColumn) {
+            const module = await createModule();
 
-        function loadWasm() {
-            return new Promise((resolve) => {
-                Module().then((module) => {
-                    wasmModule = module;
-                    console.log("WASM Module Loaded");
-                    resolve();
-                });
-            });
+            const rows = masterData.length;
+            const cols = masterData[0].length;
+
+            // Flatten the 2D array into a 1D array
+            const flattenedArr = new Int32Array(rows * cols);
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    flattenedArr[i * cols + j] = masterData[i][j];
+                }
+            }
+
+            // Create an array of indices for sorting
+            const indices = new Int32Array(rows);
+            for (let i = 0; i < rows; i++) {
+                indices[i] = i;
+            }
+
+            // Allocate memory for the flattened array and indices array
+            const arrPtr = module._malloc(flattenedArr.length * 4); // 4 bytes for each element (32-bit integer)
+            const indicesPtr = module._malloc(indices.length * 4); // 4 bytes for each index
+
+            // Copy data to WebAssembly memory
+            const arrHeap = new Int32Array(module.HEAP32.buffer, arrPtr, flattenedArr.length);
+            const indicesHeap = new Int32Array(module.HEAP32.buffer, indicesPtr, indices.length);
+            arrHeap.set(flattenedArr);
+            indicesHeap.set(indices);
+
+            // Call the WebAssembly function to sort by the selected column
+            // const targetColumn = 0; // Column to sort by (e.g., first column)
+            module._quicksort_js(arrPtr, indicesPtr, rows, cols, targetColumn);
+
+            // After sorting, the indices array contains the sorted row indices
+            const sortedIndices = Array.from(indicesHeap);
+
+            // Reorder the original 2D array based on the sorted indices
+            const sortedArray = sortedIndices.map(i => masterData[i]);
+
+            // Update the original arr2D with the sorted data
+            masterData = sortedArray;  // Update arr2D directly
+
+            // Free the allocated memory before calling the function again
+            module._free(arrPtr);
+            module._free(indicesPtr);
         }
-
-        async function wasmSort(array) {
-            if (!wasmModule) await loadWasm();
-
-            const len = array.length;
-            const bytesPerElement = 4;
-            const ptr = wasmModule._malloc(len * bytesPerElement);
-
-            // Correct way to access WASM memory
-            const heapArray = new Int32Array(wasmModule.HEAP32.buffer, ptr >> 2, len);
-            heapArray.set(array); // Copy data into WASM memory
-
-            // Call WASM function (passing ptr directly)
-            wasmModule._quickSortWrapper(ptr, len);
-
-            // Read back sorted data
-            const sortedArray = new Int32Array(wasmModule.HEAP32.buffer, ptr >> 2, len);
-
-            // Free WASM memory
-            wasmModule._free(ptr);
-
-            console.log("sortedArray", sortedArray)
-
-            return Array.from(sortedArray); // Convert to JS array
-        }
-
-
-
-
 
         async function sortTable(columnIndex) {
             sortColumn = columnIndex; // Update the global sorting column index
@@ -189,10 +196,13 @@
                 quickSortIterative(masterData, sortColumn); // Now calling quickSort with left and right indices
                 if (sortDirection[columnIndex] === -1) masterData.reverse();
             } else if (algorithm === "wasm") {
-                const numbers = masterData.map(row => row[columnIndex]);
-                const sortedNumbers = await wasmSort(numbers);
+                // const numbers = masterData.map(row => row[columnIndex]);
+                // const sortedNumbers = await wasmSort(numbers);
                 
-                masterData.forEach((row, i) => row[columnIndex] = sortedNumbers[i]);
+                // masterData.forEach((row, i) => row[columnIndex] = sortedNumbers[i]);
+                await wasmQuicksort(columnIndex);
+                if (sortDirection[columnIndex] === -1) masterData.reverse();
+
             }
 
             // Reverse sorting direction for next click
@@ -207,6 +217,7 @@
         }
 
         populateMasterData(); // Initially populate and render the table
+        console.log(masterData)
     </script>
 </body>
 </html>

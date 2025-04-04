@@ -1118,7 +1118,7 @@ var wasmImports = {
 };
 var wasmExports = await createWasm();
 var ___wasm_call_ctors = createExportWrapper('__wasm_call_ctors', 0);
-var _quicksort_js = Module['_quicksort_js'] = createExportWrapper('quicksort_js', 3);
+var _quicksort_js = Module['_quicksort_js'] = createExportWrapper('quicksort_js', 5);
 var _fflush = createExportWrapper('fflush', 1);
 var _strerror = createExportWrapper('strerror', 1);
 var _malloc = Module['_malloc'] = createExportWrapper('malloc', 1);

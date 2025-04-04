@@ -6,21 +6,21 @@
     <title>QuickSort by Column with WebAssembly</title>
 </head>
 <body>
+    <button id="sortButton" onclick="loadWasm(0)">Sort Array by Column 0</button>
+    <button id="sortButton" onclick="loadWasm(4)">Sort Array by Column 4</button>
     <script src="quicksort2.js"></script>
     <script>
-        const arr2D = [
-            [1, 333, 5, 100, 200, 7],
-            [3, 222, 6, 101, 201, 8],
-            [2, 76547, 7, 102, 202, 1],
-            [7, 24, 8, 103, 203, 12],
-            [4, 10, 9, 104, 204, 2]
+        let arr2D = [
+            [1, 333, 5, 100, 9],
+            [3, 222, 6, 101, 8],
+            [2, 76547, 7, 102, 7],
+            [7, 24, 8, 103, 6],
+            [4, 10, 9, 104, 5]
         ];
 
-        // Choose a column to sort by (e.g., sort by 1st column, which is column index 0)
-        const targetColumn = 0;
-
         // Function to handle sorting and updating the array
-        async function loadWasm() {
+        async function loadWasm(targetColumn) {
+            console.log("before arr2D", arr2D)
             const module = await createModule();
 
             const rows = arr2D.length;
@@ -51,6 +51,7 @@
             indicesHeap.set(indices);
 
             // Call the WebAssembly function to sort by the selected column
+            // const targetColumn = 0; // Column to sort by (e.g., first column)
             module._quicksort_js(arrPtr, indicesPtr, rows, cols, targetColumn);
 
             // After sorting, the indices array contains the sorted row indices
@@ -59,16 +60,21 @@
             // Reorder the original 2D array based on the sorted indices
             const sortedArray = sortedIndices.map(i => arr2D[i]);
 
-            // Free the allocated memory
+            // Update the original arr2D with the sorted data
+            arr2D = sortedArray;  // Update arr2D directly
+
+            // Free the allocated memory before calling the function again
             module._free(arrPtr);
             module._free(indicesPtr);
 
-            console.log('Sorted Array by Column ' + targetColumn + ':', sortedArray);
+            // Log the sorted array
+            console.log('Updated arr2D after sorting by column ' + targetColumn + ':', arr2D);
         }
 
-        // Call the function multiple times to ensure it works on subsequent calls
-        loadWasm();
-        setTimeout(() => loadWasm(), 2000); // Call again after 2 seconds (for example)
+        // // Attach event listener to the button
+        // document.getElementById('sortButton').addEventListener('click', (a) => {
+        //     loadWasm(a);
+        // });
     </script>
 </body>
 </html>
