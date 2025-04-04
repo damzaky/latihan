@@ -28,6 +28,7 @@
     <script>
         const ROW_NUM = 100//10_000_000;
         const ROW_SHOWN = 100;
+        const MAX_INT_32 = 2147483647;
 
         const cssColors = [
             "red", "blue", "green", "yellow", "purple", "orange", "pink", "brown",
@@ -39,7 +40,7 @@
         let masterData = []; // Holds the table data
 
         function getRandomSafeInteger() {
-            return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+            return Math.floor(Math.random() * MAX_INT_32);
         }
 
         function getRandomColorCombination() {
