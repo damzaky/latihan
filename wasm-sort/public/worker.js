@@ -1,4 +1,4 @@
-// quickSortWorker.js
+// worker.js
 self.onmessage = function(e) {
     const { data, sortColumn } = e.data;
 

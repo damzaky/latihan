@@ -25,6 +25,8 @@
     </table>
 
     <script>
+        const ROW_NUM = 50000;
+
         const cssColors = [
             "red", "blue", "green", "yellow", "purple", "orange", "pink", "brown",
             "gray", "black", "white", "cyan", "magenta", "lime", "maroon", "navy",
@@ -45,7 +47,7 @@
 
         function populateMasterData() {
             masterData = [];
-            for (let i = 1; i <= 1000; i++) {
+            for (let i = 1; i <= ROW_NUM; i++) {
                 masterData.push([
                     i,
                     getRandomSafeInteger(),
@@ -76,29 +78,48 @@
 
         let sortColumn = 0; // Track the column being sorted
 
-        function quickSort(arr, left, right, sortColumn) {
-            if (left < right) { // Ensure that the left index is less than the right index
-                const pivotIndex = partition(arr, left, right, sortColumn);
-                quickSort(arr, left, pivotIndex - 1, sortColumn);  // Sort the left part
-                quickSort(arr, pivotIndex + 1, right, sortColumn); // Sort the right part
+        function quickSortIterative(arr, sortColumn) {
+            const stack = [];
+            stack.push(0);
+            stack.push(arr.length - 1);
+
+            while (stack.length > 0) {
+                const end = stack.pop();
+                const start = stack.pop();
+
+                if (start >= end) continue;
+
+                const pivotIndex = partition(arr, start, end, sortColumn);
+
+                // Push subarrays to stack
+                if (pivotIndex - 1 > start) {
+                    stack.push(start);
+                    stack.push(pivotIndex - 1);
+                }
+                if (pivotIndex + 1 < end) {
+                    stack.push(pivotIndex + 1);
+                    stack.push(end);
+                }
             }
         }
 
+
         function partition(arr, left, right, sortColumn) {
-            const pivot = arr[right]; // Select the last element as pivot
-            let i = left - 1; // Index for the smaller element
+            const pivotIndex = left + Math.floor(Math.random() * (right - left + 1));
+            [arr[pivotIndex], arr[right]] = [arr[right], arr[pivotIndex]]; // Swap random pivot to end
+
+            const pivot = arr[right];
+            let i = left - 1;
 
             for (let j = left; j < right; j++) {
                 if (compareRows(arr[j], pivot, sortColumn)) {
                     i++;
-                    [arr[i], arr[j]] = [arr[j], arr[i]];  // Swap elements
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
                 }
             }
 
-            // Swap pivot with the element at i + 1
-            [arr[i + 1], arr[right]] = [arr[right], arr[i + 1]]; 
-
-            return i + 1; // Return the pivot index
+            [arr[i + 1], arr[right]] = [arr[right], arr[i + 1]];
+            return i + 1;
         }
 
         function compareRows(rowA, rowB, column) {
@@ -122,7 +143,7 @@
                     return (rowA[columnIndex] - rowB[columnIndex]) * sortDirection[columnIndex];
                 });
             } else if (algorithm === "quick") {
-                quickSort(masterData, 0, masterData.length - 1, sortColumn); // Now calling quickSort with left and right indices
+                quickSortIterative(masterData, sortColumn); // Now calling quickSort with left and right indices
                 if (sortDirection[columnIndex] === -1) masterData.reverse();
             } else if (algorithm === "worker") {
                 const chunks = 4;
