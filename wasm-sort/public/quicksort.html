@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickSort with WebAssembly</title>
+</head>
+<body>
+    <script src="quicksort2.js"></script>
+    <script>
+        async function loadWasm() {
+            const module = await createModule();
+
+            // Create an array to sort
+            const arr = [5, 3, 8, 4, 2, 7, 1, 6];
+
+            console.log("Unsorted Array:", arr)
+
+            // Allocate memory for the array in WebAssembly memory
+            const size = arr.length;
+            const arrPtr = module._malloc(size * 4); // Each element is 4 bytes (32-bit integer)
+
+            // Copy data to the WebAssembly memory
+            const arrHeap = new Int32Array(module.HEAP32.buffer, arrPtr, size);
+            arrHeap.set(arr);
+
+            // Call the WebAssembly quicksort function
+            module._quicksort_js(arrPtr, size);
+
+            // Copy the sorted data back into the JavaScript array
+            arrHeap.set(arrHeap);
+            const sortedArray = Array.from(arrHeap);
+
+            // Free the allocated memory
+            module._free(arrPtr);
+
+            console.log('Sorted Array:', sortedArray);
+        }
+
+        loadWasm();
+    </script>
+</body>
+</html>
