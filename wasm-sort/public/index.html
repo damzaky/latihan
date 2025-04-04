@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Table with More Colors</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+    <table>
+        <thead>
+            <tr>
+                <th>Index</th>
+                <th>Random Safe Integer</th>
+                <th>Color Combination</th>
+            </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+    </table>
+
+    <script>
+        const cssColors = [
+            "red", "blue", "green", "yellow", "purple", "orange", "pink", "brown",
+            "gray", "black", "white", "cyan", "magenta", "lime", "maroon", "navy",
+            "olive", "teal", "silver", "gold", "coral", "violet", "indigo", "turquoise"
+        ];
+
+        function getRandomSafeInteger() {
+            return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+        }
+
+        function getRandomColorCombination() {
+            const shuffled = cssColors.sort(() => Math.random() - 0.5);
+            return shuffled.slice(0, 4).join(" ");
+        }
+
+        function populateTable() {
+            const tbody = document.getElementById("table-body");
+            let rows = "";
+
+            for (let i = 1; i <= 1000; i++) {
+                rows += `<tr>
+                    <td>${i}</td>
+                    <td>${getRandomSafeInteger()}</td>
+                    <td>${getRandomColorCombination()}</td>
+                </tr>`;
+            }
+
+            tbody.innerHTML = rows;
+        }
+
+        populateTable();
+    </script>
+</body>
+</html>
