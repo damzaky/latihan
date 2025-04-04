@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuickSort with WebAssembly</title>
+    <title>QuickSort 2D Array with WebAssembly</title>
 </head>
 <body>
     <script src="quicksort2.js"></script>
@@ -11,30 +11,49 @@
         async function loadWasm() {
             const module = await createModule();
 
-            // Create an array to sort
-            const arr = [5, 3, 8, 4, 2, 7, 1, 6];
+            // Define the 2D array
+            const arr2D = [
+                [1, 333],
+                [3, 222],
+                [2, 76547],
+                [7, 24],
+                [4, 10]
+            ];
 
-            console.log("Unsorted Array:", arr)
+            console.log("arr2D", arr2D)
 
-            // Allocate memory for the array in WebAssembly memory
-            const size = arr.length;
-            const arrPtr = module._malloc(size * 4); // Each element is 4 bytes (32-bit integer)
+            // Flatten the 2D array into a 1D array
+            const rows = arr2D.length;
+            const cols = arr2D[0].length;
+            const flattenedArr = new Int32Array(rows * cols);
 
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    flattenedArr[i * cols + j] = arr2D[i][j];
+                }
+            }
+
+            // Allocate memory for the flattened array in WebAssembly
+            const arrPtr = module._malloc(flattenedArr.length * 4); // Each element is 4 bytes (32-bit integer)
+            
             // Copy data to the WebAssembly memory
-            const arrHeap = new Int32Array(module.HEAP32.buffer, arrPtr, size);
-            arrHeap.set(arr);
+            const arrHeap = new Int32Array(module.HEAP32.buffer, arrPtr, flattenedArr.length);
+            arrHeap.set(flattenedArr);
 
-            // Call the WebAssembly quicksort function
-            module._quicksort_js(arrPtr, size);
+            // Call the WebAssembly quicksort function to sort by the first column
+            module._quicksort_js(arrPtr, rows, cols);
 
             // Copy the sorted data back into the JavaScript array
             arrHeap.set(arrHeap);
-            const sortedArray = Array.from(arrHeap);
+            const sortedArray = [];
+            for (let i = 0; i < rows; i++) {
+                sortedArray.push(Array.from(arrHeap.slice(i * cols, (i + 1) * cols)));
+            }
 
             // Free the allocated memory
             module._free(arrPtr);
 
-            console.log('Sorted Array:', sortedArray);
+            console.log('Sorted Array by First Column:', sortedArray);
         }
 
         loadWasm();
