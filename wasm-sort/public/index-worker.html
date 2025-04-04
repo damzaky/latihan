@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Sortable Table multi algorithm</title>
+    <title>Sortable Table with Web Workers</title>
 </head>
 <body>
     <div class="controls">
@@ -9,7 +9,7 @@
         <select id="sortAlgorithm">
             <option value="js">JavaScript Sort</option>
             <option value="quick">Quick Sort</option>
-            <option value="wasm">Quick Sort with wasm</option>
+            <option value="worker">Quick Sort with Web Workers</option>
         </select>
     </div>
     <div class="timing" id="sortTime">Sort Time: -</div>
@@ -27,6 +27,15 @@
     <script>
         const ROW_NUM = 10_000_000;
         const ROW_SHOWN = 10;
+
+        const WORKER_COUNT = 4;
+        const workerPool = [];
+
+        for (let i = 0; i < WORKER_COUNT; i++) {
+            const worker = new Worker("worker.js");
+            worker.isBusy = false;
+            workerPool.push(worker);
+        }
 
         const cssColors = [
             "red", "blue", "green", "yellow", "purple", "orange", "pink", "brown",
@@ -146,7 +155,54 @@
             } else if (algorithm === "quick") {
                 quickSortIterative(masterData, sortColumn); // Now calling quickSort with left and right indices
                 if (sortDirection[columnIndex] === -1) masterData.reverse();
-            } 
+            } else if (algorithm === "worker") {
+                const chunks = 4;
+                const chunkSize = Math.ceil(masterData.length / chunks);
+                const workers = [];
+                const promises = [];
+
+                const startTime = performance.now();
+
+                for (let i = 0; i < chunks; i++) {
+                    const chunk = masterData.slice(i * chunkSize, (i + 1) * chunkSize);
+
+                    const worker = new Worker("worker.js");
+                    workers.push(worker);
+
+                    const promise = new Promise((resolve) => {
+                        worker.onmessage = (e) => {
+                            resolve(e.data);
+                            worker.terminate(); // Ensure we clean up after
+                        };
+                        worker.postMessage({ data: chunk, sortColumn });
+                    });
+
+                    promises.push(promise);
+                }
+
+                Promise.all(promises).then((sortedChunks) => {
+                    // Merge sorted chunks (naive merge using JS .sort())
+                    masterData = sortedChunks.flat();
+                    masterData.sort((a, b) => {
+                        if (sortColumn === 0) return (a[0] - b[0]) * sortDirection[sortColumn];
+                        if (sortColumn === 1) return (a[1] - b[1]) * sortDirection[sortColumn];
+                        return a[2].localeCompare(b[2]) * sortDirection[sortColumn];
+                    });
+
+                    sortDirection[columnIndex] *= -1;
+
+                    const endTime = performance.now();
+                    const duration = (endTime - startTime).toFixed(2);
+                    document.getElementById("sortTime").textContent = `Sort Time: ${duration} ms`;
+
+                    renderTable();
+                });
+
+                return;
+            }
+
+
+
 
             // Reverse sorting direction for next click
             sortDirection[columnIndex] *= -1;
@@ -160,6 +216,11 @@
         }
 
         populateMasterData(); // Initially populate and render the table
+
+        window.addEventListener("beforeunload", () => {
+            workerPool.forEach((worker) => worker.terminate());
+        });
+
     </script>
 </body>
 </html>

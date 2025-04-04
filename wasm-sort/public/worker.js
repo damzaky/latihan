@@ -1,40 +1,26 @@
 // worker.js
-self.onmessage = function(e) {
+self.onmessage = function (e) {
     const { data, sortColumn } = e.data;
 
     quickSortIterative(data, sortColumn);
-    self.postMessage(data);
+    self.postMessage(data); // Send back the sorted chunk
 };
 
 function quickSortIterative(arr, sortColumn) {
-    const stack = [];
-    stack.push(0);
-    stack.push(arr.length - 1);
+    const stack = [[0, arr.length - 1]];
 
-    while (stack.length > 0) {
-        const right = stack.pop();
-        const left = stack.pop();
-
+    while (stack.length) {
+        const [left, right] = stack.pop();
         if (left >= right) continue;
 
         const pivotIndex = partition(arr, left, right, sortColumn);
 
-        if (pivotIndex - 1 > left) {
-            stack.push(left);
-            stack.push(pivotIndex - 1);
-        }
-        if (pivotIndex + 1 < right) {
-            stack.push(pivotIndex + 1);
-            stack.push(right);
-        }
+        stack.push([left, pivotIndex - 1]);
+        stack.push([pivotIndex + 1, right]);
     }
 }
 
 function partition(arr, left, right, sortColumn) {
-    // Randomized pivot
-    const pivotIndex = left + Math.floor(Math.random() * (right - left + 1));
-    [arr[pivotIndex], arr[right]] = [arr[right], arr[pivotIndex]];
-
     const pivot = arr[right];
     let i = left - 1;
 
@@ -50,11 +36,7 @@ function partition(arr, left, right, sortColumn) {
 }
 
 function compareRows(rowA, rowB, column) {
-    if (column === 0) {
-        return rowA[0] <= rowB[0];
-    } else if (column === 1) {
-        return rowA[1] <= rowB[1];
-    } else {
-        return rowA[2].localeCompare(rowB[2]) <= 0;
-    }
+    if (column === 0) return rowA[0] <= rowB[0];
+    if (column === 1) return rowA[1] <= rowB[1];
+    return rowA[2].localeCompare(rowB[2]) <= 0;
 }
