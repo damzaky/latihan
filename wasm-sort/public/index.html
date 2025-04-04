@@ -12,6 +12,7 @@
             <option value="worker">Quick Sort with Web Workers</option>
         </select>
     </div>
+    <div class="timing" id="sortTime">Sort Time: -</div>
     <table>
         <thead>
             <tr>
@@ -57,15 +58,20 @@
         function renderTable() {
             const tbody = document.getElementById("table-body");
             tbody.innerHTML = ""; // Clear existing rows
-            masterData.forEach(rowData => {
+
+            for (const [idx, value] of masterData.entries()) {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${rowData[0]}</td>
-                    <td>${rowData[1]}</td>
-                    <td>${rowData[2]}</td>
+                    <td>${value[0]}</td>
+                    <td>${value[1]}</td>
+                    <td>${value[2]}</td>
                 `;
                 tbody.appendChild(row);
-            });
+
+                if (idx === 999) { // only show first 1000 rows
+                    break;
+                }
+            }
         }
 
         let sortColumn = 0; // Track the column being sorted
@@ -109,6 +115,8 @@
             sortColumn = columnIndex; // Update the global sorting column index
             const algorithm = document.getElementById("sortAlgorithm").value;
 
+            const startTime = performance.now();
+
             if (algorithm === "js") {
                 masterData.sort((rowA, rowB) => {
                     return (rowA[columnIndex] - rowB[columnIndex]) * sortDirection[columnIndex];
@@ -144,6 +152,11 @@
                     });
 
                     sortDirection[columnIndex] *= -1;
+
+                    const endTime = performance.now();
+                    const duration = (endTime - startTime).toFixed(2);
+                    document.getElementById("sortTime").textContent = `Sort Time: ${duration} ms`;
+
                     renderTable();
                 });
 
@@ -153,6 +166,10 @@
 
             // Reverse sorting direction for next click
             sortDirection[columnIndex] *= -1;
+
+            const endTime = performance.now();
+            const duration = (endTime - startTime).toFixed(2);
+            document.getElementById("sortTime").textContent = `Sort Time: ${duration} ms`;
 
             // Re-render the table with sorted rows
             renderTable();
