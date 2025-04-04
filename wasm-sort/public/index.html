@@ -24,9 +24,10 @@
         <tbody id="table-body"></tbody>
     </table>
 
+    <script src="quicksort.js"></script>
     <script>
-        const ROW_NUM = 10_000_000;
-        const ROW_SHOWN = 10;
+        const ROW_NUM = 100//10_000_000;
+        const ROW_SHOWN = 100;
 
         const cssColors = [
             "red", "blue", "green", "yellow", "purple", "orange", "pink", "brown",
@@ -133,7 +134,48 @@
             }
         }
 
-        function sortTable(columnIndex) {
+        let wasmModule;
+
+        function loadWasm() {
+            return new Promise((resolve) => {
+                Module().then((module) => {
+                    wasmModule = module;
+                    console.log("WASM Module Loaded");
+                    resolve();
+                });
+            });
+        }
+
+        async function wasmSort(array) {
+            if (!wasmModule) await loadWasm();
+
+            const len = array.length;
+            const bytesPerElement = 4;
+            const ptr = wasmModule._malloc(len * bytesPerElement);
+
+            // Correct way to access WASM memory
+            const heapArray = new Int32Array(wasmModule.HEAP32.buffer, ptr >> 2, len);
+            heapArray.set(array); // Copy data into WASM memory
+
+            // Call WASM function (passing ptr directly)
+            wasmModule._quickSortWrapper(ptr, len);
+
+            // Read back sorted data
+            const sortedArray = new Int32Array(wasmModule.HEAP32.buffer, ptr >> 2, len);
+
+            // Free WASM memory
+            wasmModule._free(ptr);
+
+            console.log("sortedArray", sortedArray)
+
+            return Array.from(sortedArray); // Convert to JS array
+        }
+
+
+
+
+
+        async function sortTable(columnIndex) {
             sortColumn = columnIndex; // Update the global sorting column index
             const algorithm = document.getElementById("sortAlgorithm").value;
 
@@ -146,7 +188,12 @@
             } else if (algorithm === "quick") {
                 quickSortIterative(masterData, sortColumn); // Now calling quickSort with left and right indices
                 if (sortDirection[columnIndex] === -1) masterData.reverse();
-            } 
+            } else if (algorithm === "wasm") {
+                const numbers = masterData.map(row => row[columnIndex]);
+                const sortedNumbers = await wasmSort(numbers);
+                
+                masterData.forEach((row, i) => row[columnIndex] = sortedNumbers[i]);
+            }
 
             // Reverse sorting direction for next click
             sortDirection[columnIndex] *= -1;
