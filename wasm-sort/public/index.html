@@ -60,6 +60,7 @@
         ];
 
         let sortDirection = [1, 1]; // Stores sorting order (1 for ascending, -1 for descending)
+        let masterData = []; // Holds the table data
 
         function getRandomSafeInteger() {
             return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
@@ -70,39 +71,67 @@
             return shuffled.slice(0, 4).join(" ");
         }
 
-        function populateTable() {
-            const tbody = document.getElementById("table-body");
-            let rows = "";
-
+        function populateMasterData() {
+            masterData = [];
             for (let i = 1; i <= 1000; i++) {
-                rows += `<tr>
-                    <td>${i}</td>
-                    <td>${getRandomSafeInteger()}</td>
-                    <td>${getRandomColorCombination()}</td>
-                </tr>`;
+                masterData.push([
+                    i,
+                    getRandomSafeInteger(),
+                    getRandomColorCombination()
+                ]);
             }
+            renderTable(); // After populating the data, render the table
+        }
 
-            tbody.innerHTML = rows;
+        function renderTable() {
+            const tbody = document.getElementById("table-body");
+            tbody.innerHTML = ""; // Clear existing rows
+            masterData.forEach(rowData => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${rowData[0]}</td>
+                    <td>${rowData[1]}</td>
+                    <td>${rowData[2]}</td>
+                `;
+                tbody.appendChild(row);
+            });
         }
 
         let sortColumn = 0; // Track the column being sorted
 
-        function extractRowData() {
-            const tbody = document.getElementById("table-body");
-            const rows = Array.from(tbody.rows);
-            return rows.map(row => ({
-                index: row.cells[0].textContent,
-                randomInt: row.cells[1].textContent,
-                colors: row.cells[2].textContent
-            }));
+        function quickSort(arr, left, right, sortColumn) {
+            if (left < right) { // Ensure that the left index is less than the right index
+                const pivotIndex = partition(arr, left, right, sortColumn);
+                quickSort(arr, left, pivotIndex - 1, sortColumn);  // Sort the left part
+                quickSort(arr, pivotIndex + 1, right, sortColumn); // Sort the right part
+            }
         }
 
-        function quickSort(arr) {
-            if (arr.length <= 1) return arr;
-            const pivot = arr[arr.length - 1];
-            const left = arr.slice(0, -1).filter(item => parseInt(item[sortColumn]) <= parseInt(pivot[sortColumn]));
-            const right = arr.slice(0, -1).filter(item => parseInt(item[sortColumn]) > parseInt(pivot[sortColumn]));
-            return [...quickSort(left), pivot, ...quickSort(right)];
+        function partition(arr, left, right, sortColumn) {
+            const pivot = arr[right]; // Select the last element as pivot
+            let i = left - 1; // Index for the smaller element
+
+            for (let j = left; j < right; j++) {
+                if (compareRows(arr[j], pivot, sortColumn)) {
+                    i++;
+                    [arr[i], arr[j]] = [arr[j], arr[i]];  // Swap elements
+                }
+            }
+
+            // Swap pivot with the element at i + 1
+            [arr[i + 1], arr[right]] = [arr[right], arr[i + 1]]; 
+
+            return i + 1; // Return the pivot index
+        }
+
+        function compareRows(rowA, rowB, column) {
+            if (column === 0) {
+                return rowA[0] <= rowB[0];  // Column 0: index
+            } else if (column === 1) {
+                return rowA[1] <= rowB[1];  // Column 1: random integer
+            } else {
+                return rowA[2].localeCompare(rowB[2]) <= 0;  // Column 2: color combination (lexicographical comparison)
+            }
         }
 
         function quickSortWithWorkers(rows) {
@@ -135,18 +164,8 @@
                 const sortedRows = sortedChunks.flat();
                 if (sortDirection[sortColumn] === -1) sortedRows.reverse();
 
-                // Rebuild the table with sorted rows
-                const tbody = document.getElementById("table-body");
-                tbody.innerHTML = "";
-                sortedRows.forEach(rowData => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${rowData.index}</td>
-                        <td>${rowData.randomInt}</td>
-                        <td>${rowData.colors}</td>
-                    `;
-                    tbody.appendChild(row);
-                });
+                masterData = sortedRows; // Update masterData with the sorted rows
+                renderTable(); // Re-render the table with sorted rows
 
                 // Update sorting time
                 const endTime = performance.now();
@@ -156,24 +175,21 @@
         }
 
         function sortTable(columnIndex) {
-            const rows = extractRowData();
-            const algorithm = document.getElementById("sortAlgorithm").value;
             sortColumn = columnIndex; // Update the global sorting column index
+            const algorithm = document.getElementById("sortAlgorithm").value;
 
             // Start timer
             const startTime = performance.now();
 
             if (algorithm === "js") {
-                rows.sort((rowA, rowB) => {
-                    let cellA = rowA[Object.keys(rowA)[columnIndex]];
-                    let cellB = rowB[Object.keys(rowB)[columnIndex]];
-                    return (cellA - cellB) * sortDirection[columnIndex];
+                masterData.sort((rowA, rowB) => {
+                    return (rowA[columnIndex] - rowB[columnIndex]) * sortDirection[columnIndex];
                 });
             } else if (algorithm === "quick") {
-                rows = quickSort(rows);
-                if (sortDirection[columnIndex] === -1) rows.reverse();
+                quickSort(masterData, 0, masterData.length - 1, sortColumn); // Now calling quickSort with left and right indices
+                if (sortDirection[columnIndex] === -1) masterData.reverse();
             } else if (algorithm === "worker") {
-                quickSortWithWorkers(rows);
+                quickSortWithWorkers(masterData);
                 return; // Don't proceed with normal sort if using workers
             }
 
@@ -185,21 +201,11 @@
             // Reverse sorting direction for next click
             sortDirection[columnIndex] *= -1;
 
-            // Rebuild the table with sorted rows
-            const tbody = document.getElementById("table-body");
-            tbody.innerHTML = "";
-            rows.forEach(rowData => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${rowData.index}</td>
-                    <td>${rowData.randomInt}</td>
-                    <td>${rowData.colors}</td>
-                `;
-                tbody.appendChild(row);
-            });
+            // Re-render the table with sorted rows
+            renderTable();
         }
 
-        populateTable();
+        populateMasterData(); // Initially populate and render the table
     </script>
 </body>
 </html>

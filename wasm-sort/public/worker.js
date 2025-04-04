@@ -1,41 +1,57 @@
 onmessage = function(e) {
     const { rows, sortColumn } = e.data;
 
-    // Adjust the sorting based on the column
-    function quickSort(arr) {
-        if (arr.length <= 1) return arr;
-        
-        // Use the column index to determine how to compare the rows
-        const pivot = arr[arr.length - 1];
-        const left = arr.slice(0, -1).filter(row => {
-            // Compare based on the chosen column
-            if (sortColumn === 1) {
-                // Column 1 is the random integer, parse as integer
-                return parseInt(row.randomInt) <= parseInt(pivot.randomInt);
-            } else if (sortColumn === 0) {
-                // Column 0 is the index, parse as integer
-                return parseInt(row.index) <= parseInt(pivot.index);
-            } else {
-                // Column 2 is the color combination, use lexicographical comparison
-                return row.colors <= pivot.colors;
-            }
-        });
+    // Iterative QuickSort using a stack to avoid recursion depth issues
+    function quickSortIterative(arr) {
+        const stack = [];
+        stack.push([0, arr.length - 1]); // Push the initial range onto the stack
 
-        const right = arr.slice(0, -1).filter(row => {
-            if (sortColumn === 1) {
-                return parseInt(row.randomInt) > parseInt(pivot.randomInt);
-            } else if (sortColumn === 0) {
-                return parseInt(row.index) > parseInt(pivot.index);
-            } else {
-                return row.colors > pivot.colors;
-            }
-        });
+        while (stack.length > 0) {
+            const [low, high] = stack.pop();
 
-        return [...quickSort(left), pivot, ...quickSort(right)];
+            if (low < high) {
+                // Partition the array and get the pivot index
+                const pivotIndex = partition(arr, low, high);
+
+                // Push the ranges to the stack
+                stack.push([low, pivotIndex - 1]);
+                stack.push([pivotIndex + 1, high]);
+            }
+        }
+
+        return arr;
     }
 
-    // Sort the rows using the quickSort function
-    const sortedRows = quickSort(rows);
+    // Partition function for quickSort
+    function partition(arr, low, high) {
+        const pivot = arr[high];  // Take the last element as pivot
+        let i = low - 1;  // Index of the smaller element
+
+        for (let j = low; j < high; j++) {
+            if (compareRows(arr[j], pivot, sortColumn)) {
+                i++;
+                [arr[i], arr[j]] = [arr[j], arr[i]];  // Swap
+            }
+        }
+
+        // Swap the pivot with the element at i+1
+        [arr[i + 1], arr[high]] = [arr[high], arr[i + 1]];
+        return i + 1;
+    }
+
+    // Comparison function for rows based on the column
+    function compareRows(rowA, rowB, column) {
+        if (column === 0) {
+            return parseInt(rowA.index) <= parseInt(rowB.index);  // Column 0: index
+        } else if (column === 1) {
+            return parseInt(rowA.randomInt) <= parseInt(rowB.randomInt);  // Column 1: random integer
+        } else {
+            return rowA.colors.localeCompare(rowB.colors) <= 0;  // Column 2: color combination (lexicographical comparison)
+        }
+    }
+
+    // Sort the rows using the iterative quickSort function
+    const sortedRows = quickSortIterative(rows);
 
     // Return the sorted rows back to the main thread
     postMessage(sortedRows);
