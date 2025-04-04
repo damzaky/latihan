@@ -26,7 +26,7 @@
 
     <script src="quicksort2.js"></script>
     <script>
-        const ROW_NUM = 100//10_000_000;
+        const ROW_NUM = 10000//10_000_000;
         const ROW_SHOWN = 100;
         const MAX_INT_32 = 2147483647;
 
@@ -138,16 +138,25 @@
         async function wasmQuicksort(targetColumn) {
             const module = await createModule();
 
+                // Override the print and printErr methods to route to console
+    module.print = function(text) {
+        console.log(text); // Redirect normal print (stdout) to console.log
+    };
+    
+    module.printErr = function(text) {
+        console.error(text); // Redirect error print (stderr) to console.error
+    };
             const rows = masterData.length;
             const cols = masterData[0].length;
 
             // Flatten the 2D array into a 1D array
             const flattenedArr = new Int32Array(rows * cols);
             for (let i = 0; i < rows; i++) {
-                for (let j = 0; j < cols; j++) {
-                    flattenedArr[i * cols + j] = masterData[i][j];
-                }
+                flattenedArr[i * cols + 0] = masterData[i][0]; // Index
+                flattenedArr[i * cols + 1] = masterData[i][1]; // Random int
+                // flattenedArr[i * cols + 2] = 0;                // Placeholder for string column
             }
+
 
             // Create an array of indices for sorting
             const indices = new Int32Array(rows);
@@ -156,21 +165,62 @@
             }
 
             // Allocate memory for the flattened array and indices array
-            const arrPtr = module._malloc(flattenedArr.length * 4); // 4 bytes for each element (32-bit integer)
-            const indicesPtr = module._malloc(indices.length * 4); // 4 bytes for each index
+            // const arrPtr = module._malloc(flattenedArr.length * 4); // 4 bytes for each element (32-bit integer)
+            // const indicesPtr = module._malloc(indices.length * 4); // 4 bytes for each index
+            console.log("flattenedArr length:", flattenedArr.length); // Should be ROW_NUM * 3
+console.log("allocated bytes for arr:", flattenedArr.length * 4);
+console.log("allocated bytes for indices:", indices.length * 4);
+console.log("WASM HEAP32.byteLength:", module.HEAP32.byteLength);
+console.log("MasterData length:", masterData.length);
+console.log("Indices length:", indices.length);
+console.log("First 5 indices:", indices.slice(0, 5));
+console.log("Max index in indices:", Math.max(...indices));
+console.log("Min index in indices:", Math.min(...indices));
 
-            // Copy data to WebAssembly memory
-            const arrHeap = new Int32Array(module.HEAP32.buffer, arrPtr, flattenedArr.length);
-            const indicesHeap = new Int32Array(module.HEAP32.buffer, indicesPtr, indices.length);
-            arrHeap.set(flattenedArr);
-            indicesHeap.set(indices);
+
+//             const totalBytes = flattenedArr.length * 4;
+// const arrPtr = module._malloc(totalBytes);
+// if (!arrPtr) console.error("Failed to allocate memory for arr");
+
+// const indexBytes = indices.length * 4;
+// const indicesPtr = module._malloc(indexBytes);
+// if (!indicesPtr) console.error("Failed to allocate memory for indices");
+
+//             // Copy data to WebAssembly memory
+//             // const arrHeap = new Int32Array(module.HEAP32.buffer, arrPtr, flattenedArr.length);
+//             // const indicesHeap = new Int32Array(module.HEAP32.buffer, indicesPtr, indices.length);
+//             // arrHeap.set(flattenedArr);
+//             // indicesHeap.set(indices);
+//             module.HEAP32.set(flattenedArr, arrPtr >> 2);
+//             module.HEAP32.set(indices, indicesPtr >> 2);
+
+const arrSize = flattenedArr.length * 4;
+const indicesSize = indices.length * 4;
+
+const arrPtr = module._malloc(arrSize);
+const indicesPtr = module._malloc(indicesSize);
+
+// 🔁 Recreate HEAP32 after malloc
+const heap = new Int32Array(module.HEAP32.buffer);
+
+// ✅ Copy data directly using pointer offsets (>> 2 because it's 4 bytes per Int32)
+heap.set(flattenedArr, arrPtr >> 2);
+heap.set(indices, indicesPtr >> 2);
+
+console.log("arrPtr:", arrPtr);
+console.log("indicesPtr:", indicesPtr);
+console.log("distance between:", indicesPtr - arrPtr);
+
 
             // Call the WebAssembly function to sort by the selected column
             // const targetColumn = 0; // Column to sort by (e.g., first column)
             module._quicksort_js(arrPtr, indicesPtr, rows, cols, targetColumn);
 
             // After sorting, the indices array contains the sorted row indices
-            const sortedIndices = Array.from(indicesHeap);
+            const sortedIndices = Array.from(
+    module.HEAP32.subarray(indicesPtr >> 2, (indicesPtr >> 2) + indices.length)
+);
+
 
             // Reorder the original 2D array based on the sorted indices
             const sortedArray = sortedIndices.map(i => masterData[i]);

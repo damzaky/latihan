@@ -20,6 +20,11 @@
 
         // Function to handle sorting and updating the array
         async function loadWasm(targetColumn) {
+            if (targetColumn >= cols) {
+    console.error("Invalid targetColumn:", targetColumn, "for cols:", cols);
+    return;
+}
+
             console.log("before arr2D", arr2D)
             const module = await createModule();
 
